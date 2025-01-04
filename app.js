@@ -26,7 +26,6 @@ async function fetchTrendData() {
 }
 
 
-// Update the chart with new data
 function updateChart(labels, data, aggregation) {
   const ctx = document.getElementById("trendChart").getContext("2d");
 

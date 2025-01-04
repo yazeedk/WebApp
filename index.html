@@ -13,7 +13,6 @@
       margin: 0;
       padding: 0;
     }
-    /* Tab bar styles */
     .tab-bar {
       display: flex;
       background-color: #f1f1f1;
@@ -31,7 +30,6 @@
       background-color: #4CAF50;
       color: white;
     }
-    /* Container styles */
     .container {
       display: none;
     }
@@ -45,28 +43,25 @@
       height: 1000px;
       width: 100%;
     }
-    /* Sentiment Analysis Section - Reduced Size */
     #sentimentContainer {
       max-width: 600px;
       margin: 0 auto;
     }
     #sentimentChart {
       width: 100%;
-      height: 200px; /* Reduced height */
+      height: 200px;
     }
   </style>
 </head>
 <body>
   <h1>Tweets</h1>
   
-  <!-- Tab bar to switch between Trend Diagram, Map, and Sentiment Analysis -->
   <div class="tab-bar">
     <button id="trendTab" class="active" onclick="showTab('trend')">Twitter Trends</button>
     <button id="mapTab" onclick="showTab('map')">Twitter Map</button>
     <button id="sentimentTab" onclick="showTab('sentiment')">Sentiment Analysis</button>
   </div>
 
-  <!-- Trend Diagram Container -->
   <div id="trendContainer" class="container">
     <h2>Twitter Trends</h2>
     <div>
@@ -81,7 +76,6 @@
     <canvas id="trendChart" width="400" height="200"></canvas>
   </div>
 
-  <!-- Map Container -->
   <div id="mapContainer" class="container">
     <h2>Twitter Map</h2>
     <div class="controls">
@@ -92,7 +86,6 @@
     <div id="map"></div>
   </div>
 
-  <!-- Sentiment Analysis Container -->
   <div id="sentimentContainer" class="container">
     <h2>Sentiment Analysis</h2>
     <div>
@@ -105,13 +98,11 @@
 
 
   <script>
-    // Initialize the map
     const map = L.map('map').setView([34.1463, -118.1004], 10); // Default to Pasadena, CA
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
-    // Fetch tweets from the server (using MongoDB)
     async function fetchAndRenderTweets() {
         const keyword = document.getElementById('keyword').value.trim();
         if (!keyword) {
@@ -133,7 +124,6 @@
         }
     }
 
-    // Render tweets on the map
     function renderTweetsOnMap(tweets) {
         map.eachLayer(layer => {
             if (layer instanceof L.Marker) map.removeLayer(layer);
@@ -149,26 +139,20 @@
         if (bounds.length) map.fitBounds(bounds);
     }
 
-    // Fetch Trend Data
     async function fetchTrendData() {
         const aggregation = document.getElementById('aggregation').value;
         try {
             const response = await fetch(`http://localhost:3000/api/trend/${encodeURIComponent(aggregation)}`);
             const data = await response.json();
-
-            // Process the trend data and update the chart
             updateTrendChart(data);
         } catch (error) {
             console.error("Error fetching trend data:", error);
             alert("Failed to fetch trend data.");
         }
     }
-
-    // Update the Trend Chart
     function updateTrendChart(data) {
         const labels = data.map(item => item._id);
-        const trendData = data.map(item => item.count); // Assuming `count` contains the trend values
-
+        const trendData = data.map(item => item.count);
         const ctx = document.getElementById('trendChart').getContext('2d');
         const trendChart = new Chart(ctx, {
             type: 'line',
@@ -184,7 +168,6 @@
         });
     }
 
-    // Fetch Sentiment Data
     async function fetchSentimentData() {
         const sentimentKeyword = document.getElementById('sentimentKeyword').value.trim();
         if (!sentimentKeyword) {
@@ -195,7 +178,6 @@
             const response = await fetch(`http://localhost:3000/api/sentiment/${encodeURIComponent(sentimentKeyword)}`);
             const data = await response.json();
 
-            // Process the sentiment data and update the chart
             updateSentimentChart(data);
         } catch (error) {
             console.error("Error fetching sentiment data:", error);
@@ -203,13 +185,12 @@
         }
     }
 
-    // Update the Sentiment Chart
     function updateSentimentChart(data) {
         const sentimentLabels = ['Positive', 'Neutral', 'Negative'];
         const sentimentValues = [
-            data.find(item => item._id === 1)?.count || 0, // Positive
-            data.find(item => item._id === 0)?.count || 0, // Neutral
-            data.find(item => item._id === -1)?.count || 0 // Negative
+            data.find(item => item._id === 1)?.count || 0, 
+            data.find(item => item._id === 0)?.count || 0, 
+            data.find(item => item._id === -1)?.count || 0 
         ];
 
         const ctx = document.getElementById('sentimentChart').getContext('2d');
@@ -226,7 +207,6 @@
         });
     }
 
-    // Switch between tabs (Trend Diagram, Map, Sentiment Analysis)
     function showTab(tab) {
         if (tab === 'trend') {
             document.getElementById('trendContainer').style.display = 'block';
