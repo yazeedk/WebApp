@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,18 +8,21 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
       margin: 0;
       padding: 0;
     }
+
     .tab-bar {
       display: flex;
       background-color: #f1f1f1;
       padding: 10px;
       justify-content: space-around;
     }
+
     .tab-bar button {
       padding: 10px 20px;
       cursor: pointer;
@@ -26,36 +30,45 @@
       border: none;
       border-radius: 5px;
     }
+
     .tab-bar button.active {
       background-color: #4CAF50;
       color: white;
     }
+
     .container {
       display: none;
     }
+
     #trendContainer {
       display: block;
     }
-    #mapContainer, #sentimentContainer {
+
+    #mapContainer,
+    #sentimentContainer {
       display: none;
     }
+
     #map {
       height: 1000px;
       width: 100%;
     }
+
     #sentimentContainer {
       max-width: 600px;
       margin: 0 auto;
     }
+
     #sentimentChart {
       width: 100%;
       height: 200px;
     }
   </style>
 </head>
+
 <body>
   <h1>Tweets</h1>
-  
+
   <div class="tab-bar">
     <button id="trendTab" class="active" onclick="showTab('trend')">Twitter Trends</button>
     <button id="mapTab" onclick="showTab('map')">Twitter Map</button>
@@ -70,6 +83,8 @@
         <option value="hourly">Hourly</option>
         <option value="daily">Daily</option>
       </select>
+      <label for="trendKeyword">Enter Keyword for Trend: </label>
+      <input type="text" id="trendKeyword" placeholder="e.g., love, hate" />
       <button onclick="fetchTrendData()">Load Trend</button>
     </div>
 
@@ -79,11 +94,12 @@
   <div id="mapContainer" class="container">
     <h2>Twitter Map</h2>
     <div class="controls">
-      <label for="keyword">Enter Keyword: </label>
-      <input type="text" id="keyword" placeholder="e.g., marine, football" />
+
+      <label for="sentimentKeyword">Enter Keyword for Sentiment: </label>
+      <input type="text" id="keyword" placeholder="e.g., love, hate" />
       <button onclick="fetchAndRenderTweets()">Search Tweets</button>
     </div>
-    <div id="map"></div>
+    <div id="map" style="max-width: 90%; max-height: 520px;"></div>
   </div>
 
   <div id="sentimentContainer" class="container">
@@ -96,142 +112,179 @@
     <canvas id="sentimentChart" width="300" height="150"></canvas> <!-- Reduced size -->
   </div>
 
-
   <script>
-    const map = L.map('map').setView([34.1463, -118.1004], 10); // Default to Pasadena, CA
+    let map;
+
+    if (map) {
+      map.remove();
+    }
+    map = L.map('map'); // Default to Pasadena, CA
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
+      attribution: '© OpenStreetMap contributors'
     }).addTo(map);
 
     async function fetchAndRenderTweets() {
-        const keyword = document.getElementById('keyword').value.trim();
-        if (!keyword) {
-            alert("Please enter a keyword!");
-            return;
+      const keyword = document.getElementById('keyword').value.trim();
+      if (!keyword) {
+        alert("Please enter a keyword!");
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:3000/api/locations/${encodeURIComponent(keyword)}`);
+        const data = await response.json();
+
+        if (data.length > 0) {
+          renderTweetsOnMap(data);
+        } else {
+          alert("No tweets found for the given keyword.");
         }
-        try {
-            const response = await fetch(`http://localhost:3000/api/locations/${encodeURIComponent(keyword)}`);
-            const data = await response.json();
-            console.error(data);
-            if (data.length > 0) {
-                renderTweetsOnMap(data);
-            } else {
-                alert("No tweets found for the given keyword.");
-            }
-        } catch (error) {
-            console.error("Error fetching tweets:", error);
-            alert("Failed to fetch tweets.");
-        }
+      } catch (error) {
+        console.error("Error fetching tweets:", error);
+        alert("Failed to fetch tweets.");
+      }
     }
 
     function renderTweetsOnMap(tweets) {
-        map.eachLayer(layer => {
-            if (layer instanceof L.Marker) map.removeLayer(layer);
-        });
-        tweets.forEach(tweet => {
-            if (tweet.coordinates) {
-                const [lon, lat] = tweet.coordinates.split(',').map(Number); // Assuming coordinates are stored as "lon,lat"
-                const marker = L.marker([lat, lon]).addTo(map);
-                marker.bindPopup(`<b>${tweet._id}</b><br>${tweet.cleaned_text}<br><small>${new Date(tweet.timestamp).toLocaleString()}</small>`);
-            }
-        });
-        const bounds = tweets.map(tweet => tweet.coordinates.split(',').map(Number).reverse());
-        if (bounds.length) map.fitBounds(bounds);
+
+      map.eachLayer(layer => {
+        if (layer instanceof L.Marker) map.removeLayer(layer);
+      });
+
+      const bounds = [];
+
+      tweets.forEach(tweet => {
+        if (tweet.coordinates && tweet.coordinates.length === 2) {
+          const lat = parseFloat(tweet.coordinates[0]);
+          const lon = parseFloat(tweet.coordinates[1]);
+
+          if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+
+            const marker = L.marker([lat, lon]).addTo(map);
+            marker.bindPopup(`
+      <b>${tweet._id}</b><br>
+      ${tweet.text}<br>
+      <small>${new Date(tweet.created_at).toLocaleString()}</small>
+    `);
+
+            bounds.push([lat, lon]);
+          }
+        }
+      });
+
+      if (bounds.length > 0) {
+        map.fitBounds(bounds);
+      } else {
+        alert('No valid tweets to display on the map.');
+      }
     }
+
 
     async function fetchTrendData() {
-        const aggregation = document.getElementById('aggregation').value;
-        try {
-            const response = await fetch(`http://localhost:3000/api/trend/${encodeURIComponent(aggregation)}`);
-            const data = await response.json();
-            updateTrendChart(data);
-        } catch (error) {
-            console.error("Error fetching trend data:", error);
-            alert("Failed to fetch trend data.");
-        }
+      const aggregation = document.getElementById('aggregation').value;
+      const trendKeyword = document.getElementById('trendKeyword').value;
+      try {
+        const response = await fetch(`http://localhost:3000/api/trend/${encodeURIComponent(aggregation)}&${encodeURIComponent(trendKeyword)}`);
+        const data = await response.json();
+        updateTrendChart(data);
+      } catch (error) {
+        console.error("Error fetching trend data:", error);
+        alert("Failed to fetch trend data.");
+      }
     }
+
+    let chart;
+
     function updateTrendChart(data) {
-        const labels = data.map(item => item._id);
-        const trendData = data.map(item => item.count);
-        const ctx = document.getElementById('trendChart').getContext('2d');
-        const trendChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Trend',
-                    data: trendData,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            }
-        });
+      const labels = data.map(item => item._id);
+      const trendData = data.map(item => item.count);
+
+      const ctx = document.getElementById('trendChart').getContext('2d');
+
+      if (chart) {
+        chart.destroy();
+      }
+
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Trend',
+            data: trendData,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1
+          }]
+        }
+      });
     }
+
 
     async function fetchSentimentData() {
-        const sentimentKeyword = document.getElementById('sentimentKeyword').value.trim();
-        if (!sentimentKeyword) {
-            alert("Please enter a keyword for sentiment analysis!");
-            return;
-        }
-        try {
-            const response = await fetch(`http://localhost:3000/api/sentiment/${encodeURIComponent(sentimentKeyword)}`);
-            const data = await response.json();
+      const sentimentKeyword = document.getElementById('sentimentKeyword').value.trim();
+      if (!sentimentKeyword) {
+        alert("Please enter a keyword for sentiment analysis!");
+        return;
+      }
+      try {
+        const response = await fetch(`http://localhost:3000/api/sentiment/${encodeURIComponent(sentimentKeyword)}`);
+        const data = await response.json();
 
-            updateSentimentChart(data);
-        } catch (error) {
-            console.error("Error fetching sentiment data:", error);
-            alert("Failed to fetch sentiment data.");
-        }
+        updateSentimentChart(data);
+      } catch (error) {
+        console.error("Error fetching sentiment data:", error);
+        alert("Failed to fetch sentiment data.");
+      }
     }
 
     function updateSentimentChart(data) {
-        const sentimentLabels = ['Positive', 'Neutral', 'Negative'];
-        const sentimentValues = [
-            data.find(item => item._id === 1)?.count || 0, 
-            data.find(item => item._id === 0)?.count || 0, 
-            data.find(item => item._id === -1)?.count || 0 
-        ];
-
-        const ctx = document.getElementById('sentimentChart').getContext('2d');
-        const sentimentChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: sentimentLabels,
-                datasets: [{
-                    label: 'Sentiment Distribution',
-                    data: sentimentValues,
-                    backgroundColor: ['#4CAF50', '#FFEB3B', '#F44336'],
-                }]
-            }
-        });
+      const sentimentLabels = ['Positive', 'Neutral', 'Negative'];
+      const sentimentValues = [
+        data.find(item => item._id === 1)?.count || 0,
+        data.find(item => item._id === 0)?.count || 0,
+        data.find(item => item._id === -1)?.count || 0
+      ];
+      if (chart) {
+        chart.destroy();
+      }
+      const ctx = document.getElementById('sentimentChart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: sentimentLabels,
+          datasets: [{
+            label: 'Sentiment Distribution',
+            data: sentimentValues,
+            backgroundColor: ['#4CAF50', '#FFEB3B', '#F44336'],
+          }]
+        }
+      });
     }
 
     function showTab(tab) {
-        if (tab === 'trend') {
-            document.getElementById('trendContainer').style.display = 'block';
-            document.getElementById('mapContainer').style.display = 'none';
-            document.getElementById('sentimentContainer').style.display = 'none';
-            document.getElementById('trendTab').classList.add('active');
-            document.getElementById('mapTab').classList.remove('active');
-            document.getElementById('sentimentTab').classList.remove('active');
-        } else if (tab === 'map') {
-            document.getElementById('trendContainer').style.display = 'none';
-            document.getElementById('mapContainer').style.display = 'block';
-            document.getElementById('sentimentContainer').style.display = 'none';
-            document.getElementById('mapTab').classList.add('active');
-            document.getElementById('trendTab').classList.remove('active');
-            document.getElementById('sentimentTab').classList.remove('active');
-        } else {
-            document.getElementById('trendContainer').style.display = 'none';
-            document.getElementById('mapContainer').style.display = 'none';
-            document.getElementById('sentimentContainer').style.display = 'block';
-            document.getElementById('sentimentTab').classList.add('active');
-            document.getElementById('trendTab').classList.remove('active');
-            document.getElementById('mapTab').classList.remove('active');
-        }
+      if (tab === 'trend') {
+        document.getElementById('trendContainer').style.display = 'block';
+        document.getElementById('mapContainer').style.display = 'none';
+        document.getElementById('sentimentContainer').style.display = 'none';
+        document.getElementById('trendTab').classList.add('active');
+        document.getElementById('mapTab').classList.remove('active');
+        document.getElementById('sentimentTab').classList.remove('active');
+      } else if (tab === 'map') {
+        document.getElementById('trendContainer').style.display = 'none';
+        document.getElementById('mapContainer').style.display = 'block';
+        document.getElementById('sentimentContainer').style.display = 'none';
+        document.getElementById('mapTab').classList.add('active');
+        document.getElementById('trendTab').classList.remove('active');
+        document.getElementById('sentimentTab').classList.remove('active');
+      } else {
+        document.getElementById('trendContainer').style.display = 'none';
+        document.getElementById('mapContainer').style.display = 'none';
+        document.getElementById('sentimentContainer').style.display = 'block';
+        document.getElementById('sentimentTab').classList.add('active');
+        document.getElementById('trendTab').classList.remove('active');
+        document.getElementById('mapTab').classList.remove('active');
+      }
     }
-</script>
+  </script>
+</body>
 
-  </body>
 </html>
